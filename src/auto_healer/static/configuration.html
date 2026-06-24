@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Configuration</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Auto Healer</p>
+        <h1>Endpoint Configuration</h1>
+      </div>
+      <nav class="topnav">
+        <a href="/">Console</a>
+        <a href="/docs">Swagger</a>
+        <a href="/documentation">Docs</a>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <section class="config-layout" aria-label="Auto Healer endpoint configuration">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Auto Healer Endpoint</h2>
+              <p>Configure the service endpoint and ADFS credentials used for authentication.</p>
+            </div>
+          </div>
+
+          <form id="configForm" class="config-form">
+            <label class="wide-field">
+              Endpoint URL
+              <input id="endpointUrl" placeholder="https://auto-healer.example.com/api" required />
+            </label>
+
+            <label>
+              Authentication
+              <select id="authType">
+                <option value="adfs">ADFS</option>
+              </select>
+            </label>
+
+            <label>
+              Client ID
+              <input id="adfsClientId" autocomplete="off" required />
+            </label>
+
+            <label>
+              Server ID
+              <input id="adfsServerId" autocomplete="off" required />
+            </label>
+
+            <label>
+              User Name
+              <input id="adfsUsername" autocomplete="username" required />
+            </label>
+
+            <label class="wide-field">
+              Password
+              <input id="adfsPassword" autocomplete="current-password" type="password" />
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Save Configuration</button>
+              <span id="configStatus" role="status"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Current Configuration</h2>
+              <p>Password status is shown without exposing the secret.</p>
+            </div>
+          </div>
+          <div id="configSummary" class="config-summary"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/configuration.js"></script>
+  </body>
+</html>

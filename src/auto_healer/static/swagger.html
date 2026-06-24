@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Swagger</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <style>
+      body {
+        margin: 0;
+        background: #f6f7f9;
+      }
+
+      .swagger-topbar {
+        align-items: center;
+        background: #17202a;
+        color: #ffffff;
+        display: flex;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        gap: 16px;
+        justify-content: space-between;
+        padding: 14px 24px;
+      }
+
+      .swagger-topbar a {
+        color: #a7f3d0;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      #swagger-ui {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="swagger-topbar">
+      <strong>Auto Healer Swagger</strong>
+      <nav>
+        <a href="/">Console</a>
+        <a href="/documentation">Documentation</a>
+        <a href="/openapi.json">OpenAPI JSON</a>
+      </nav>
+    </header>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.addEventListener("load", () => {
+        SwaggerUIBundle({
+          url: "/openapi.json",
+          dom_id: "#swagger-ui",
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: "BaseLayout",
+        });
+      });
+    </script>
+  </body>
+</html>

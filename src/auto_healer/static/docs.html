@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer API Docs</title>
+    <link rel="stylesheet" href="/docs.css" />
+  </head>
+  <body>
+    <header class="docs-header">
+      <div>
+        <p class="eyebrow">Auto Healer</p>
+        <h1>API Documentation</h1>
+        <p class="lede">HTTP endpoints for ingesting monitoring events and presenting stored incident data.</p>
+      </div>
+      <nav>
+        <a href="/">Console</a>
+        <a href="/docs">Swagger</a>
+        <a href="/openapi.json">OpenAPI JSON</a>
+      </nav>
+    </header>
+
+    <main class="docs-main">
+      <section>
+        <h2>Run the service</h2>
+        <pre><code>uv run auto-healer --host 127.0.0.1 --port 8080 --db auto_healer.sqlite3</code></pre>
+      </section>
+
+      <section>
+        <h2>Endpoints</h2>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/health</code>
+          <p>Returns service health.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <code>/events</code>
+          <p>Accepts a monitoring event from Dynatrace, Splunk, Phoenix, or another JSON producer.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/events</code>
+          <p>Lists stored events. Supports <code>project_id</code>, <code>project_name</code>, <code>component</code>, and <code>limit</code> query parameters.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <code>/policies</code>
+          <p>Saves scale limits and holiday/off-hours stop settings for a project component.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/policies</code>
+          <p>Lists saved application policies for the presentation layer.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <code>/endpoint-config</code>
+          <p>Saves the Auto Healer endpoint URL and ADFS authentication settings.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/endpoint-config</code>
+          <p>Returns the current endpoint configuration without returning the saved password.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Event payload</h2>
+        <p>Each event requires <code>component</code> and at least one project identifier.</p>
+        <div class="grid">
+          <div>
+            <h3>Project fields</h3>
+            <ul>
+              <li><code>project_id</code>, <code>projectId</code>, or <code>pid</code></li>
+              <li><code>project_name</code>, <code>projectName</code>, or <code>project</code></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Optional aliases</h3>
+            <ul>
+              <li><code>source</code> or <code>monitoring_system</code></li>
+              <li><code>severity</code> or <code>level</code></li>
+              <li><code>title</code> or <code>event_name</code></li>
+              <li><code>message</code> or <code>description</code></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Example request</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/events \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project_id": "checkout",
+    "project_name": "Checkout",
+    "component": "payments-api",
+    "source": "dynatrace",
+    "severity": "critical",
+    "message": "p95 latency crossed threshold"
+  }'</code></pre>
+      </section>
+
+      <section>
+        <h2>Example policy</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/policies \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project_id": "checkout",
+    "project_name": "Checkout",
+    "component": "payments-api",
+    "min_replicas": 1,
+    "max_replicas": 6,
+    "scale_up_threshold": 80,
+    "scale_down_threshold": 25,
+    "stop_during_off_hours": true,
+    "off_hours_start": "20:00",
+    "off_hours_end": "06:00",
+    "stop_during_holidays": true,
+    "holiday_calendar": "2026-12-25 Christmas"
+  }'</code></pre>
+      </section>
+
+      <section>
+        <h2>Example endpoint configuration</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/endpoint-config \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "endpoint_url": "https://auto-healer.example.com/api",
+    "auth_type": "adfs",
+    "adfs_client_id": "auto-healer-ui",
+    "adfs_server_id": "urn:auto-healer",
+    "adfs_username": "ops.user@example.com",
+    "adfs_password": "change-me"
+  }'</code></pre>
+      </section>
+    </main>
+  </body>
+</html>
