@@ -161,6 +161,87 @@ def build_openapi_schema() -> dict[str, Any]:
                     },
                 },
             },
+            "/splunk/alerts": {
+                "post": {
+                    "summary": "Ingest a Splunk alert",
+                    "description": (
+                        "Accepts Splunk webhook-style alerts and normalizes them "
+                        "into Auto Healer events. Common fields can be sent at the "
+                        "top level or inside the Splunk result object."
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SplunkAlertInput"
+                                },
+                                "examples": {
+                                    "system_error": {
+                                        "summary": "System error alert",
+                                        "value": {
+                                            "search_name": "System Error Surge",
+                                            "sid": "scheduler__admin__search__RMD5",
+                                            "app": "platform",
+                                            "owner": "auto-healer",
+                                            "alert_type": "system_error",
+                                            "result": {
+                                                "project_id": "platform",
+                                                "project_name": "Platform",
+                                                "component": "node-17",
+                                                "host": "node-17",
+                                                "severity": "critical",
+                                                "message": "Root filesystem usage reached 96%",
+                                                "error": "disk_usage_high",
+                                                "filesystem": "/",
+                                                "usage_percent": 96,
+                                            },
+                                        },
+                                    },
+                                    "application_error": {
+                                        "summary": "Application error alert",
+                                        "value": {
+                                            "search_name": "Application Error Surge",
+                                            "sid": "scheduler__admin__search__RMD6",
+                                            "app": "checkout",
+                                            "owner": "auto-healer",
+                                            "alert_type": "application_error",
+                                            "result": {
+                                                "project_id": "checkout",
+                                                "project_name": "Checkout",
+                                                "component": "payments-api",
+                                                "severity": "critical",
+                                                "message": "Payment authorization exceptions crossed threshold",
+                                                "exception": "PaymentAuthorizationException",
+                                                "error_count": 148,
+                                                "error_rate_percent": 18,
+                                            },
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Splunk alert stored as an event.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Event"}
+                                }
+                            },
+                        },
+                        "400": {
+                            "description": "Invalid Splunk alert payload.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Error"}
+                                }
+                            },
+                        },
+                    },
+                }
+            },
             "/policies": {
                 "get": {
                     "summary": "List application control policies",
@@ -311,6 +392,12 @@ def build_openapi_schema() -> dict[str, Any]:
                                     "adfs_server_id": "urn:auto-healer",
                                     "adfs_username": "ops.user@example.com",
                                     "adfs_password": "change-me",
+                                    "retry_enabled": True,
+                                    "max_retry_attempts": 3,
+                                    "retry_backoff_seconds": 2,
+                                    "circuit_breaker_enabled": True,
+                                    "circuit_breaker_failure_threshold": 5,
+                                    "circuit_breaker_reset_timeout_seconds": 60,
                                 },
                             }
                         },
@@ -328,6 +415,144 @@ def build_openapi_schema() -> dict[str, Any]:
                         },
                         "400": {
                             "description": "Invalid configuration.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Error"}
+                                }
+                            },
+                        },
+                    },
+                },
+            },
+            "/audit-log": {
+                "get": {
+                    "summary": "List audit trail entries",
+                    "description": (
+                        "Returns changes recorded for rules/policies and endpoint "
+                        "configuration updates."
+                    ),
+                    "parameters": [
+                        {
+                            "name": "entity_type",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": ["policy", "endpoint_config"],
+                            },
+                        },
+                        {
+                            "name": "entity_id",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "schema": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 500,
+                                "default": 100,
+                            },
+                        },
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Audit entries.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "audit_log": {
+                                                "type": "array",
+                                                "items": {
+                                                    "$ref": "#/components/schemas/AuditEntry"
+                                                },
+                                            }
+                                        },
+                                        "required": ["audit_log"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/postmortems": {
+                "get": {
+                    "summary": "List blameless postmortems and RCA records",
+                    "parameters": [
+                        {"name": "incident_id", "in": "query", "schema": {"type": "string"}},
+                        {"name": "project_id", "in": "query", "schema": {"type": "string"}},
+                        {"name": "component", "in": "query", "schema": {"type": "string"}},
+                        {
+                            "name": "status",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": ["draft", "in_review", "published"],
+                            },
+                        },
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Postmortem records.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "postmortems": {
+                                                "type": "array",
+                                                "items": {
+                                                    "$ref": "#/components/schemas/Postmortem"
+                                                },
+                                            }
+                                        },
+                                        "required": ["postmortems"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
+                "post": {
+                    "summary": "Create or update a blameless postmortem/RCA",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/PostmortemInput"},
+                                "example": {
+                                    "incident_id": "INC-2026-0001",
+                                    "project_id": "checkout",
+                                    "project_name": "Checkout",
+                                    "component": "payments-api",
+                                    "title": "Payment authorization error surge",
+                                    "severity": "critical",
+                                    "status": "draft",
+                                    "owner": "sre-team",
+                                    "summary": "Payment authorization failures increased for a subset of users.",
+                                    "impact": "Checkout conversion dropped during the incident window.",
+                                    "root_cause": "Downstream payment provider timeout caused retry amplification.",
+                                    "corrective_actions": "Tune retries, add circuit breaker, update runbook.",
+                                    "lessons_learned": "Retries need per-provider budgets.",
+                                },
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Postmortem saved.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Postmortem"}
+                                }
+                            },
+                        },
+                        "400": {
+                            "description": "Invalid postmortem.",
                             "content": {
                                 "application/json": {
                                     "schema": {"$ref": "#/components/schemas/Error"}
@@ -397,6 +622,39 @@ def build_openapi_schema() -> dict[str, Any]:
                         "created_at",
                     ],
                 },
+                "SplunkAlertInput": {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "properties": {
+                        "search_name": {"type": "string"},
+                        "sid": {"type": "string"},
+                        "app": {"type": "string"},
+                        "owner": {"type": "string"},
+                        "alert_type": {
+                            "type": "string",
+                            "enum": ["system_error", "application_error"],
+                        },
+                        "project_id": {"type": "string"},
+                        "project_name": {"type": "string"},
+                        "component": {"type": "string"},
+                        "severity": {"type": "string"},
+                        "message": {"type": "string"},
+                        "result": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "properties": {
+                                "project_id": {"type": "string"},
+                                "project_name": {"type": "string"},
+                                "component": {"type": "string"},
+                                "host": {"type": "string"},
+                                "severity": {"type": "string"},
+                                "message": {"type": "string"},
+                                "error": {"type": "string"},
+                                "exception": {"type": "string"},
+                            },
+                        },
+                    },
+                },
                 "Error": {
                     "type": "object",
                     "properties": {"error": {"type": "string"}},
@@ -458,6 +716,31 @@ def build_openapi_schema() -> dict[str, Any]:
                         "adfs_server_id": {"type": "string"},
                         "adfs_username": {"type": "string"},
                         "adfs_password": {"type": "string", "format": "password"},
+                        "retry_enabled": {"type": "boolean", "default": True},
+                        "max_retry_attempts": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 3,
+                        },
+                        "retry_backoff_seconds": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 2,
+                        },
+                        "circuit_breaker_enabled": {
+                            "type": "boolean",
+                            "default": True,
+                        },
+                        "circuit_breaker_failure_threshold": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 5,
+                        },
+                        "circuit_breaker_reset_timeout_seconds": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 60,
+                        },
                     },
                     "required": [
                         "endpoint_url",
@@ -477,6 +760,12 @@ def build_openapi_schema() -> dict[str, Any]:
                         "adfs_server_id": {"type": "string"},
                         "adfs_username": {"type": "string"},
                         "password_set": {"type": "boolean"},
+                        "retry_enabled": {"type": "boolean"},
+                        "max_retry_attempts": {"type": "integer"},
+                        "retry_backoff_seconds": {"type": "integer"},
+                        "circuit_breaker_enabled": {"type": "boolean"},
+                        "circuit_breaker_failure_threshold": {"type": "integer"},
+                        "circuit_breaker_reset_timeout_seconds": {"type": "integer"},
                         "updated_at": {"type": "string", "format": "date-time"},
                     },
                     "required": [
@@ -487,8 +776,78 @@ def build_openapi_schema() -> dict[str, Any]:
                         "adfs_server_id",
                         "adfs_username",
                         "password_set",
+                        "retry_enabled",
+                        "max_retry_attempts",
+                        "retry_backoff_seconds",
+                        "circuit_breaker_enabled",
+                        "circuit_breaker_failure_threshold",
+                        "circuit_breaker_reset_timeout_seconds",
                         "updated_at",
                     ],
+                },
+                "AuditEntry": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "entity_type": {"type": "string"},
+                        "entity_id": {"type": "string"},
+                        "action": {"type": "string", "enum": ["created", "updated"]},
+                        "summary": {"type": "string"},
+                        "details": {"type": "object", "additionalProperties": True},
+                        "created_at": {"type": "string", "format": "date-time"},
+                    },
+                    "required": [
+                        "id",
+                        "entity_type",
+                        "entity_id",
+                        "action",
+                        "summary",
+                        "details",
+                        "created_at",
+                    ],
+                },
+                "PostmortemInput": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "incident_id": {"type": "string"},
+                        "project_id": {"type": "string"},
+                        "project_name": {"type": "string"},
+                        "component": {"type": "string"},
+                        "title": {"type": "string"},
+                        "severity": {"type": "string"},
+                        "status": {
+                            "type": "string",
+                            "enum": ["draft", "in_review", "published"],
+                        },
+                        "owner": {"type": "string"},
+                        "summary": {"type": "string"},
+                        "impact": {"type": "string"},
+                        "root_cause": {"type": "string"},
+                        "corrective_actions": {"type": "string"},
+                        "lessons_learned": {"type": "string"},
+                    },
+                    "required": ["incident_id", "component", "title"],
+                },
+                "Postmortem": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/PostmortemInput"},
+                        {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "created_at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                },
+                                "updated_at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                },
+                            },
+                            "required": ["id", "created_at", "updated_at"],
+                        },
+                    ]
                 },
             }
         },

@@ -30,6 +30,51 @@ body {
   padding: 28px clamp(16px, 5vw, 56px);
 }
 
+.docs-brand-heading {
+  display: grid;
+  gap: 12px;
+}
+
+.docs-brand-lockup {
+  align-items: center;
+  color: var(--ink);
+  display: inline-flex;
+  gap: 10px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.docs-brand-mark {
+  align-items: center;
+  background: var(--accent);
+  border: 1px solid #0b5f59;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 900;
+  height: 42px;
+  justify-content: center;
+  line-height: 1;
+  width: 42px;
+}
+
+.docs-brand-name,
+.docs-brand-tagline {
+  display: block;
+}
+
+.docs-brand-name {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.docs-brand-tagline {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 12px;

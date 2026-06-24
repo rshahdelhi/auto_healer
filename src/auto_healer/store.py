@@ -49,6 +49,43 @@ class EndpointConfig:
     adfs_server_id: str
     adfs_username: str
     password_set: bool
+    retry_enabled: bool
+    max_retry_attempts: int
+    retry_backoff_seconds: int
+    circuit_breaker_enabled: bool
+    circuit_breaker_failure_threshold: int
+    circuit_breaker_reset_timeout_seconds: int
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class AuditEntry:
+    id: int
+    entity_type: str
+    entity_id: str
+    action: str
+    summary: str
+    details: dict[str, Any]
+    created_at: str
+
+
+@dataclass(frozen=True)
+class Postmortem:
+    id: int
+    incident_id: str
+    project_id: str | None
+    project_name: str | None
+    component: str
+    title: str
+    severity: str | None
+    status: str
+    owner: str | None
+    summary: str | None
+    impact: str | None
+    root_cause: str | None
+    corrective_actions: str | None
+    lessons_learned: str | None
+    created_at: str
     updated_at: str
 
 
@@ -112,8 +149,95 @@ class EventStore:
                     adfs_server_id TEXT NOT NULL,
                     adfs_username TEXT NOT NULL,
                     adfs_password TEXT NOT NULL,
+                    retry_enabled INTEGER NOT NULL DEFAULT 1,
+                    max_retry_attempts INTEGER NOT NULL DEFAULT 3,
+                    retry_backoff_seconds INTEGER NOT NULL DEFAULT 2,
+                    circuit_breaker_enabled INTEGER NOT NULL DEFAULT 1,
+                    circuit_breaker_failure_threshold INTEGER NOT NULL DEFAULT 5,
+                    circuit_breaker_reset_timeout_seconds INTEGER NOT NULL DEFAULT 60,
                     updated_at TEXT NOT NULL
                 )
+                """
+            )
+            _ensure_column(conn, "endpoint_config", "retry_enabled", "INTEGER NOT NULL DEFAULT 1")
+            _ensure_column(conn, "endpoint_config", "max_retry_attempts", "INTEGER NOT NULL DEFAULT 3")
+            _ensure_column(conn, "endpoint_config", "retry_backoff_seconds", "INTEGER NOT NULL DEFAULT 2")
+            _ensure_column(conn, "endpoint_config", "circuit_breaker_enabled", "INTEGER NOT NULL DEFAULT 1")
+            _ensure_column(
+                conn,
+                "endpoint_config",
+                "circuit_breaker_failure_threshold",
+                "INTEGER NOT NULL DEFAULT 5",
+            )
+            _ensure_column(
+                conn,
+                "endpoint_config",
+                "circuit_breaker_reset_timeout_seconds",
+                "INTEGER NOT NULL DEFAULT 60",
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity_type TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    details TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS postmortems (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    incident_id TEXT NOT NULL UNIQUE,
+                    project_id TEXT,
+                    project_name TEXT,
+                    component TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    severity TEXT,
+                    status TEXT NOT NULL,
+                    owner TEXT,
+                    summary TEXT,
+                    impact TEXT,
+                    root_cause TEXT,
+                    corrective_actions TEXT,
+                    lessons_learned TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_postmortems_project_component
+                ON postmortems(project_id, project_name, component, status)
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_log_entity
+                ON audit_log(entity_type, entity_id, created_at)
+                """
+            )
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS audit_log_prevent_update
+                BEFORE UPDATE ON audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'audit_log records are immutable');
+                END
+                """
+            )
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS audit_log_prevent_delete
+                BEFORE DELETE ON audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'audit_log records are immutable');
+                END
                 """
             )
 
@@ -258,6 +382,14 @@ class EventStore:
         if not 0 <= scale_up_threshold <= 100:
             raise ValueError("scale_up_threshold must be between 0 and 100")
 
+        existing_policy = self.list_policies(
+            project_id=project_id,
+            project_name=project_name,
+            component=component,
+            limit=1,
+        )
+        action = "updated" if existing_policy else "created"
+
         with self._connect() as conn:
             conn.execute(
                 """
@@ -306,12 +438,20 @@ class EventStore:
                 ),
             )
 
-        return self.list_policies(
+        policy = self.list_policies(
             project_id=project_id,
             project_name=project_name,
             component=component,
             limit=1,
         )[0]
+        self.record_audit(
+            entity_type="policy",
+            entity_id=_policy_entity_id(policy),
+            action=action,
+            summary=f"Policy {action} for {policy.project_id or policy.project_name}/{policy.component}",
+            details=_policy_audit_details(policy),
+        )
+        return policy
 
     def list_policies(
         self,
@@ -352,18 +492,53 @@ class EventStore:
         adfs_server_id = _required_text(payload, "adfs_server_id")
         adfs_username = _required_text(payload, "adfs_username")
         adfs_password = _optional_text(payload.get("adfs_password"))
+        retry_enabled = _bool_value(payload.get("retry_enabled", True))
+        max_retry_attempts = _int_value(
+            payload.get("max_retry_attempts"),
+            "max_retry_attempts",
+            default=3,
+        )
+        retry_backoff_seconds = _int_value(
+            payload.get("retry_backoff_seconds"),
+            "retry_backoff_seconds",
+            default=2,
+        )
+        circuit_breaker_enabled = _bool_value(
+            payload.get("circuit_breaker_enabled", True)
+        )
+        circuit_breaker_failure_threshold = _int_value(
+            payload.get("circuit_breaker_failure_threshold"),
+            "circuit_breaker_failure_threshold",
+            default=5,
+        )
+        circuit_breaker_reset_timeout_seconds = _int_value(
+            payload.get("circuit_breaker_reset_timeout_seconds"),
+            "circuit_breaker_reset_timeout_seconds",
+            default=60,
+        )
         updated_at = datetime.now(timezone.utc).isoformat()
 
         if auth_type != "adfs":
             raise ValueError("auth_type must be adfs")
         if not endpoint_url.startswith(("http://", "https://")):
             raise ValueError("endpoint_url must start with http:// or https://")
+        if max_retry_attempts < 0:
+            raise ValueError("max_retry_attempts must be greater than or equal to 0")
+        if retry_backoff_seconds < 0:
+            raise ValueError("retry_backoff_seconds must be greater than or equal to 0")
+        if circuit_breaker_failure_threshold < 1:
+            raise ValueError("circuit_breaker_failure_threshold must be greater than or equal to 1")
+        if circuit_breaker_reset_timeout_seconds < 1:
+            raise ValueError("circuit_breaker_reset_timeout_seconds must be greater than or equal to 1")
 
         current_password = self._get_endpoint_password()
         if adfs_password is None:
             if current_password is None:
                 raise ValueError("adfs_password is required")
             adfs_password = current_password
+
+        existing_config = self.get_endpoint_config()
+        action = "updated" if existing_config else "created"
 
         with self._connect() as conn:
             conn.execute(
@@ -376,9 +551,15 @@ class EventStore:
                     adfs_server_id,
                     adfs_username,
                     adfs_password,
+                    retry_enabled,
+                    max_retry_attempts,
+                    retry_backoff_seconds,
+                    circuit_breaker_enabled,
+                    circuit_breaker_failure_threshold,
+                    circuit_breaker_reset_timeout_seconds,
                     updated_at
                 )
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     endpoint_url = excluded.endpoint_url,
                     auth_type = excluded.auth_type,
@@ -386,6 +567,12 @@ class EventStore:
                     adfs_server_id = excluded.adfs_server_id,
                     adfs_username = excluded.adfs_username,
                     adfs_password = excluded.adfs_password,
+                    retry_enabled = excluded.retry_enabled,
+                    max_retry_attempts = excluded.max_retry_attempts,
+                    retry_backoff_seconds = excluded.retry_backoff_seconds,
+                    circuit_breaker_enabled = excluded.circuit_breaker_enabled,
+                    circuit_breaker_failure_threshold = excluded.circuit_breaker_failure_threshold,
+                    circuit_breaker_reset_timeout_seconds = excluded.circuit_breaker_reset_timeout_seconds,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -395,6 +582,12 @@ class EventStore:
                     adfs_server_id,
                     adfs_username,
                     adfs_password,
+                    int(retry_enabled),
+                    max_retry_attempts,
+                    retry_backoff_seconds,
+                    int(circuit_breaker_enabled),
+                    circuit_breaker_failure_threshold,
+                    circuit_breaker_reset_timeout_seconds,
                     updated_at,
                 ),
             )
@@ -402,6 +595,13 @@ class EventStore:
         config = self.get_endpoint_config()
         if config is None:
             raise ValueError("endpoint configuration could not be saved")
+        self.record_audit(
+            entity_type="endpoint_config",
+            entity_id="auto-healer",
+            action=action,
+            summary=f"Endpoint configuration {action}",
+            details=_config_audit_details(config),
+        )
         return config
 
     def get_endpoint_config(self) -> EndpointConfig | None:
@@ -421,6 +621,218 @@ class EventStore:
         if row is None:
             return None
         return row["adfs_password"]
+
+    def record_audit(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        action: str,
+        summary: str,
+        details: dict[str, Any],
+    ) -> AuditEntry:
+        created_at = datetime.now(timezone.utc).isoformat()
+        details_json = json.dumps(details, sort_keys=True, separators=(",", ":"))
+
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO audit_log (
+                    entity_type,
+                    entity_id,
+                    action,
+                    summary,
+                    details,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entity_type,
+                    entity_id,
+                    action,
+                    summary,
+                    details_json,
+                    created_at,
+                ),
+            )
+            audit_id = int(cursor.lastrowid)
+
+        return AuditEntry(
+            id=audit_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            summary=summary,
+            details=details,
+            created_at=created_at,
+        )
+
+    def list_audit_entries(
+        self,
+        *,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        limit: int = 100,
+    ) -> list[AuditEntry]:
+        query = "SELECT * FROM audit_log"
+        filters: list[str] = []
+        params: list[Any] = []
+
+        if entity_type:
+            filters.append("entity_type = ?")
+            params.append(entity_type)
+        if entity_id:
+            filters.append("entity_id = ?")
+            params.append(entity_id)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        query += " ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+        return [_row_to_audit_entry(row) for row in rows]
+
+    def upsert_postmortem(self, payload: dict[str, Any]) -> Postmortem:
+        incident_id = _required_text(payload, "incident_id")
+        project_id = _optional_text(
+            payload.get("project_id")
+            or payload.get("projectId")
+            or payload.get("pid")
+        )
+        project_name = _optional_text(
+            payload.get("project_name")
+            or payload.get("projectName")
+            or payload.get("project")
+        )
+        component = _required_text(payload, "component")
+        title = _required_text(payload, "title")
+        severity = _optional_text(payload.get("severity"))
+        status = _optional_text(payload.get("status")) or "draft"
+        owner = _optional_text(payload.get("owner"))
+        summary = _optional_text(payload.get("summary"))
+        impact = _optional_text(payload.get("impact"))
+        root_cause = _optional_text(payload.get("root_cause"))
+        corrective_actions = _optional_text(payload.get("corrective_actions"))
+        lessons_learned = _optional_text(payload.get("lessons_learned"))
+        updated_at = datetime.now(timezone.utc).isoformat()
+
+        if not project_id and not project_name:
+            raise ValueError("project_id or project_name is required")
+        if status not in {"draft", "in_review", "published"}:
+            raise ValueError("status must be draft, in_review, or published")
+
+        existing = self.list_postmortems(incident_id=incident_id, limit=1)
+        action = "updated" if existing else "created"
+        created_at = existing[0].created_at if existing else updated_at
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO postmortems (
+                    incident_id,
+                    project_id,
+                    project_name,
+                    component,
+                    title,
+                    severity,
+                    status,
+                    owner,
+                    summary,
+                    impact,
+                    root_cause,
+                    corrective_actions,
+                    lessons_learned,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(incident_id) DO UPDATE SET
+                    project_id = excluded.project_id,
+                    project_name = excluded.project_name,
+                    component = excluded.component,
+                    title = excluded.title,
+                    severity = excluded.severity,
+                    status = excluded.status,
+                    owner = excluded.owner,
+                    summary = excluded.summary,
+                    impact = excluded.impact,
+                    root_cause = excluded.root_cause,
+                    corrective_actions = excluded.corrective_actions,
+                    lessons_learned = excluded.lessons_learned,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    incident_id,
+                    project_id,
+                    project_name,
+                    component,
+                    title,
+                    severity,
+                    status,
+                    owner,
+                    summary,
+                    impact,
+                    root_cause,
+                    corrective_actions,
+                    lessons_learned,
+                    created_at,
+                    updated_at,
+                ),
+            )
+
+        postmortem = self.list_postmortems(incident_id=incident_id, limit=1)[0]
+        self.record_audit(
+            entity_type="postmortem",
+            entity_id=postmortem.incident_id,
+            action=action,
+            summary=f"Postmortem {action} for {postmortem.incident_id}",
+            details=_postmortem_audit_details(postmortem),
+        )
+        return postmortem
+
+    def list_postmortems(
+        self,
+        *,
+        incident_id: str | None = None,
+        project_id: str | None = None,
+        project_name: str | None = None,
+        component: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[Postmortem]:
+        query = "SELECT * FROM postmortems"
+        filters: list[str] = []
+        params: list[Any] = []
+
+        if incident_id:
+            filters.append("incident_id = ?")
+            params.append(incident_id)
+        if project_id:
+            filters.append("project_id = ?")
+            params.append(project_id)
+        if project_name:
+            filters.append("project_name = ?")
+            params.append(project_name)
+        if component:
+            filters.append("component = ?")
+            params.append(component)
+        if status:
+            filters.append("status = ?")
+            params.append(status)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        query += " ORDER BY updated_at DESC, id DESC LIMIT ?"
+        params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+        return [_row_to_postmortem(row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
@@ -457,6 +869,22 @@ def _bool_value(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
+
+
+def _ensure_column(
+    conn: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_definition: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        conn.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+        )
 
 
 def _row_to_event(row: sqlite3.Row) -> Event:
@@ -502,5 +930,105 @@ def _row_to_endpoint_config(row: sqlite3.Row) -> EndpointConfig:
         adfs_server_id=row["adfs_server_id"],
         adfs_username=row["adfs_username"],
         password_set=bool(row["adfs_password"]),
+        retry_enabled=bool(row["retry_enabled"]),
+        max_retry_attempts=row["max_retry_attempts"],
+        retry_backoff_seconds=row["retry_backoff_seconds"],
+        circuit_breaker_enabled=bool(row["circuit_breaker_enabled"]),
+        circuit_breaker_failure_threshold=row["circuit_breaker_failure_threshold"],
+        circuit_breaker_reset_timeout_seconds=row[
+            "circuit_breaker_reset_timeout_seconds"
+        ],
         updated_at=row["updated_at"],
     )
+
+
+def _row_to_audit_entry(row: sqlite3.Row) -> AuditEntry:
+    return AuditEntry(
+        id=row["id"],
+        entity_type=row["entity_type"],
+        entity_id=row["entity_id"],
+        action=row["action"],
+        summary=row["summary"],
+        details=json.loads(row["details"]),
+        created_at=row["created_at"],
+    )
+
+
+def _row_to_postmortem(row: sqlite3.Row) -> Postmortem:
+    return Postmortem(
+        id=row["id"],
+        incident_id=row["incident_id"],
+        project_id=row["project_id"],
+        project_name=row["project_name"],
+        component=row["component"],
+        title=row["title"],
+        severity=row["severity"],
+        status=row["status"],
+        owner=row["owner"],
+        summary=row["summary"],
+        impact=row["impact"],
+        root_cause=row["root_cause"],
+        corrective_actions=row["corrective_actions"],
+        lessons_learned=row["lessons_learned"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _policy_entity_id(policy: AppPolicy) -> str:
+    project = policy.project_id or policy.project_name or "unknown"
+    return f"{project}:{policy.component}"
+
+
+def _policy_audit_details(policy: AppPolicy) -> dict[str, Any]:
+    return {
+        "project_id": policy.project_id,
+        "project_name": policy.project_name,
+        "component": policy.component,
+        "min_replicas": policy.min_replicas,
+        "max_replicas": policy.max_replicas,
+        "scale_up_threshold": policy.scale_up_threshold,
+        "scale_down_threshold": policy.scale_down_threshold,
+        "stop_during_off_hours": policy.stop_during_off_hours,
+        "off_hours_start": policy.off_hours_start,
+        "off_hours_end": policy.off_hours_end,
+        "stop_during_holidays": policy.stop_during_holidays,
+        "holiday_calendar": policy.holiday_calendar,
+    }
+
+
+def _config_audit_details(config: EndpointConfig) -> dict[str, Any]:
+    return {
+        "endpoint_url": config.endpoint_url,
+        "auth_type": config.auth_type,
+        "adfs_client_id": config.adfs_client_id,
+        "adfs_server_id": config.adfs_server_id,
+        "adfs_username": config.adfs_username,
+        "password_set": config.password_set,
+        "retry_enabled": config.retry_enabled,
+        "max_retry_attempts": config.max_retry_attempts,
+        "retry_backoff_seconds": config.retry_backoff_seconds,
+        "circuit_breaker_enabled": config.circuit_breaker_enabled,
+        "circuit_breaker_failure_threshold": config.circuit_breaker_failure_threshold,
+        "circuit_breaker_reset_timeout_seconds": (
+            config.circuit_breaker_reset_timeout_seconds
+        ),
+    }
+
+
+def _postmortem_audit_details(postmortem: Postmortem) -> dict[str, Any]:
+    return {
+        "incident_id": postmortem.incident_id,
+        "project_id": postmortem.project_id,
+        "project_name": postmortem.project_name,
+        "component": postmortem.component,
+        "title": postmortem.title,
+        "severity": postmortem.severity,
+        "status": postmortem.status,
+        "owner": postmortem.owner,
+        "summary": postmortem.summary,
+        "impact": postmortem.impact,
+        "root_cause": postmortem.root_cause,
+        "corrective_actions": postmortem.corrective_actions,
+        "lessons_learned": postmortem.lessons_learned,
+    }

@@ -8,13 +8,20 @@
   </head>
   <body>
     <header class="docs-header">
-      <div>
-        <p class="eyebrow">Auto Healer</p>
+      <div class="docs-brand-heading">
+        <a class="docs-brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="docs-brand-mark">AH</span>
+          <span>
+            <span class="docs-brand-name">Auto Healer</span>
+            <span class="docs-brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
         <h1>API Documentation</h1>
         <p class="lede">HTTP endpoints for ingesting monitoring events and presenting stored incident data.</p>
       </div>
       <nav>
-        <a href="/">Console</a>
+        <a href="/">Dashboard</a>
+        <a href="/console">Console</a>
         <a href="/docs">Swagger</a>
         <a href="/openapi.json">OpenAPI JSON</a>
       </nav>
@@ -37,6 +44,11 @@
           <span class="method post">POST</span>
           <code>/events</code>
           <p>Accepts a monitoring event from Dynatrace, Splunk, Phoenix, or another JSON producer.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <code>/splunk/alerts</code>
+          <p>Accepts Splunk alert payloads for system and application errors.</p>
         </div>
         <div class="endpoint">
           <span class="method get">GET</span>
@@ -62,6 +74,21 @@
           <span class="method get">GET</span>
           <code>/endpoint-config</code>
           <p>Returns the current endpoint configuration without returning the saved password.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/audit-log</code>
+          <p>Lists audit trail entries for policy/rule and endpoint configuration changes.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <code>/postmortems</code>
+          <p>Creates or updates blameless postmortem and RCA records for SRE reviews.</p>
+        </div>
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <code>/postmortems</code>
+          <p>Lists saved postmortems by incident, project, component, or status.</p>
         </div>
       </section>
 
@@ -103,6 +130,53 @@
       </section>
 
       <section>
+        <h2>Example Splunk system error</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/splunk/alerts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "search_name": "System Error Surge",
+    "sid": "scheduler__admin__search__RMD5",
+    "app": "platform",
+    "owner": "auto-healer",
+    "alert_type": "system_error",
+    "result": {
+      "project_id": "platform",
+      "project_name": "Platform",
+      "component": "node-17",
+      "host": "node-17",
+      "severity": "critical",
+      "message": "Root filesystem usage reached 96%",
+      "error": "disk_usage_high",
+      "filesystem": "/",
+      "usage_percent": 96
+    }
+  }'</code></pre>
+      </section>
+
+      <section>
+        <h2>Example Splunk application error</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/splunk/alerts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "search_name": "Application Error Surge",
+    "sid": "scheduler__admin__search__RMD6",
+    "app": "checkout",
+    "owner": "auto-healer",
+    "alert_type": "application_error",
+    "result": {
+      "project_id": "checkout",
+      "project_name": "Checkout",
+      "component": "payments-api",
+      "severity": "critical",
+      "message": "Payment authorization exceptions crossed threshold",
+      "exception": "PaymentAuthorizationException",
+      "error_count": 148,
+      "error_rate_percent": 18
+    }
+  }'</code></pre>
+      </section>
+
+      <section>
         <h2>Example policy</h2>
         <pre><code>curl -X POST http://127.0.0.1:8080/policies \
   -H 'Content-Type: application/json' \
@@ -132,7 +206,39 @@
     "adfs_client_id": "auto-healer-ui",
     "adfs_server_id": "urn:auto-healer",
     "adfs_username": "ops.user@example.com",
-    "adfs_password": "change-me"
+    "adfs_password": "change-me",
+    "retry_enabled": true,
+    "max_retry_attempts": 3,
+    "retry_backoff_seconds": 2,
+    "circuit_breaker_enabled": true,
+    "circuit_breaker_failure_threshold": 5,
+    "circuit_breaker_reset_timeout_seconds": 60
+  }'</code></pre>
+      </section>
+
+      <section>
+        <h2>Audit trail</h2>
+        <pre><code>curl 'http://127.0.0.1:8080/audit-log?entity_type=policy&limit=25'</code></pre>
+      </section>
+
+      <section>
+        <h2>Example blameless postmortem</h2>
+        <pre><code>curl -X POST http://127.0.0.1:8080/postmortems \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "incident_id": "INC-2026-0001",
+    "project_id": "checkout",
+    "project_name": "Checkout",
+    "component": "payments-api",
+    "title": "Payment authorization error surge",
+    "severity": "critical",
+    "status": "draft",
+    "owner": "sre-team",
+    "summary": "Payment authorization failures increased for a subset of users.",
+    "impact": "Checkout conversion dropped during the incident window.",
+    "root_cause": "Downstream payment provider timeout caused retry amplification.",
+    "corrective_actions": "Tune retries, add circuit breaker, update runbook.",
+    "lessons_learned": "Retries need per-provider budgets."
   }'</code></pre>
       </section>
     </main>

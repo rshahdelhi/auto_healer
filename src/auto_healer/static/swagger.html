@@ -28,6 +28,39 @@
         text-decoration: none;
       }
 
+      .swagger-brand {
+        align-items: center;
+        color: #ffffff;
+        display: inline-flex;
+        gap: 10px;
+        text-decoration: none;
+      }
+
+      .swagger-mark {
+        align-items: center;
+        background: #0f766e;
+        border: 1px solid #5eead4;
+        border-radius: 8px;
+        color: #ffffff;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 900;
+        height: 38px;
+        justify-content: center;
+        width: 38px;
+      }
+
+      .swagger-brand-text {
+        display: grid;
+        gap: 2px;
+      }
+
+      .swagger-brand-text span {
+        color: #a7f3d0;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
       #swagger-ui {
         max-width: 1280px;
         margin: 0 auto;
@@ -36,9 +69,13 @@
   </head>
   <body>
     <header class="swagger-topbar">
-      <strong>Auto Healer Swagger</strong>
+      <a class="swagger-brand" href="/">
+        <span class="swagger-mark">AH</span>
+        <strong class="swagger-brand-text">Auto Healer <span>Swagger API</span></strong>
+      </a>
       <nav>
-        <a href="/">Console</a>
+        <a href="/">Dashboard</a>
+        <a href="/console">Console</a>
         <a href="/documentation">Documentation</a>
         <a href="/openapi.json">OpenAPI JSON</a>
       </nav>

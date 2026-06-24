@@ -8,12 +8,19 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <p class="eyebrow">Auto Healer</p>
+      <div class="brand-heading">
+        <a class="brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="brand-mark">AH</span>
+          <span>
+            <span class="brand-name">Auto Healer</span>
+            <span class="brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
         <h1>Endpoint Configuration</h1>
       </div>
       <nav class="topnav">
-        <a href="/">Console</a>
+        <a href="/">Dashboard</a>
+        <a href="/console">Console</a>
         <a href="/docs">Swagger</a>
         <a href="/documentation">Docs</a>
       </nav>
@@ -62,6 +69,36 @@
               <input id="adfsPassword" autocomplete="current-password" type="password" />
             </label>
 
+            <label class="check-field">
+              <input id="retryEnabled" type="checkbox" checked />
+              Enable retries for endpoint calls
+            </label>
+
+            <label class="check-field">
+              <input id="circuitBreakerEnabled" type="checkbox" checked />
+              Enable circuit breaker protection
+            </label>
+
+            <label>
+              Max Retry Attempts
+              <input id="maxRetryAttempts" min="0" step="1" type="number" value="3" />
+            </label>
+
+            <label>
+              Retry Backoff Seconds
+              <input id="retryBackoffSeconds" min="0" step="1" type="number" value="2" />
+            </label>
+
+            <label>
+              Failure Threshold
+              <input id="circuitBreakerFailureThreshold" min="1" step="1" type="number" value="5" />
+            </label>
+
+            <label>
+              Reset Timeout Seconds
+              <input id="circuitBreakerResetTimeoutSeconds" min="1" step="1" type="number" value="60" />
+            </label>
+
             <div class="form-actions">
               <button type="submit">Save Configuration</button>
               <span id="configStatus" role="status"></span>
@@ -77,6 +114,17 @@
             </div>
           </div>
           <div id="configSummary" class="config-summary"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Configuration Audit</h2>
+              <p>Recent endpoint configuration changes.</p>
+            </div>
+            <button id="configAuditRefreshButton" type="button">Refresh</button>
+          </div>
+          <div id="configAuditList" class="audit-list"></div>
         </div>
       </section>
     </main>

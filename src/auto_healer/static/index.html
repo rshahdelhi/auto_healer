@@ -3,225 +3,159 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Auto Healer Console</title>
+    <title>Auto Healer Dashboard</title>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Auto Healer</p>
-        <h1>Monitoring Event Console</h1>
+    <header class="topbar dashboard-topbar">
+      <div class="brand-heading">
+        <a class="brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="brand-mark">AH</span>
+          <span>
+            <span class="brand-name">Auto Healer</span>
+            <span class="brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
+        <h1>Distributed Systems Recovery Dashboard</h1>
       </div>
       <div class="topbar-actions">
         <nav class="topnav">
+          <a href="/console">Console</a>
           <a href="/configuration">Configuration</a>
           <a href="/docs">Swagger</a>
         </nav>
-        <div class="status-pill" id="healthStatus">Checking service</div>
+        <div class="status-pill" id="dashboardHealth">Checking service</div>
       </div>
     </header>
 
-    <main class="shell">
-      <section class="workspace" aria-label="Mock monitoring event">
-        <div class="panel mock-panel">
-          <div class="panel-header">
-            <div>
-              <h2>Mock Event</h2>
-              <p>Generate provider-shaped payloads for ingestion testing.</p>
-            </div>
-            <button class="icon-button" id="randomizeButton" title="Randomize mock data" type="button">
-              <span aria-hidden="true">↻</span>
-              <span class="sr-only">Randomize mock data</span>
-            </button>
+    <main class="shell dashboard-shell">
+      <section class="dashboard-hero" aria-label="Auto Healer overview">
+        <div class="dashboard-hero-copy">
+          <p class="eyebrow">Auto Healer Control Plane</p>
+          <h2>Turn monitoring signals into controlled recovery decisions.</h2>
+          <p>
+            Auto Healer accepts alerts from Dynatrace, Splunk, Phoenix, ADFS, and
+            other monitoring systems, stores each event by project and component,
+            and gives operations teams a policy-driven interface for scale and
+            shutdown decisions.
+          </p>
+          <div class="dashboard-actions">
+            <a class="primary-link" href="/console">Open Operator Console</a>
+            <a class="secondary-link" href="/configuration">Configure Endpoint</a>
           </div>
-
-          <form id="eventForm" class="event-form">
-            <label>
-              Source
-              <select id="source" name="source">
-                <option value="dynatrace">Dynatrace</option>
-                <option value="splunk">Splunk</option>
-                <option value="phoenix">Phoenix</option>
-                <option value="generic">Generic</option>
-                <option value="adfs">ADFS Error Surge</option>
-                <option value="capacity_up">Capacity Scale Up</option>
-                <option value="capacity_down">Capacity Scale Down</option>
-                <option value="off_hours">Off-hours Stop</option>
-              </select>
-            </label>
-
-            <label>
-              Project ID
-              <input id="projectId" name="projectId" value="checkout" />
-            </label>
-
-            <label>
-              Project Name
-              <input id="projectName" name="projectName" value="Checkout" />
-            </label>
-
-            <label>
-              Component
-              <input id="component" name="component" value="payments-api" required />
-            </label>
-
-            <label>
-              Severity
-              <select id="severity" name="severity">
-                <option value="critical">Critical</option>
-                <option value="warning">Warning</option>
-                <option value="info">Info</option>
-              </select>
-            </label>
-
-            <label class="wide-field">
-              Message
-              <textarea id="message" name="message" rows="4">p95 latency crossed threshold</textarea>
-            </label>
-
-            <div class="form-actions">
-              <button type="submit">Send Mock Event</button>
-              <span id="submitStatus" role="status"></span>
-            </div>
-          </form>
         </div>
-
-        <div class="panel payload-panel">
-          <div class="panel-header">
-            <div>
-              <h2>Payload Preview</h2>
-              <p>Provider-specific fields are preserved in SQLite.</p>
-            </div>
+        <div class="dashboard-snapshot" aria-label="Dashboard summary">
+          <div class="snapshot-row">
+            <span>Sources</span>
+            <strong>Dynatrace, Splunk, Phoenix, ADFS</strong>
           </div>
-          <pre id="payloadPreview" aria-label="Payload preview"></pre>
+          <div class="snapshot-row">
+            <span>Controls</span>
+            <strong>Scale up, scale down, stop windows</strong>
+          </div>
+          <div class="snapshot-row">
+            <span>Governance</span>
+            <strong>Immutable audit log and blameless RCA</strong>
+          </div>
         </div>
       </section>
 
-      <section class="policy-workspace" aria-label="Application scaling policy">
-        <div class="panel policy-panel">
-          <div class="panel-header">
-            <div>
-              <h2>Application Policy</h2>
-              <p>Set scale limits and stop windows for holidays or off hours.</p>
-            </div>
-          </div>
+      <section class="dashboard-grid" aria-label="Tool features">
+        <article class="feature-card">
+          <span class="feature-number">01</span>
+          <h3>Monitoring Event Intake</h3>
+          <p>
+            Receive HTTP POST events from monitoring systems and preserve the full
+            provider payload while normalizing project, component, source, severity,
+            title, and message fields.
+          </p>
+        </article>
 
-          <form id="policyForm" class="policy-form">
-            <label>
-              Project ID
-              <input id="policyProjectId" value="checkout" />
-            </label>
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <h3>Mock Scenario Console</h3>
+          <p>
+            Generate test events for Dynatrace, Splunk, Phoenix, ADFS error surge,
+            capacity scale up, capacity scale down, and off-hours stop workflows.
+          </p>
+        </article>
 
-            <label>
-              Project Name
-              <input id="policyProjectName" value="Checkout" />
-            </label>
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <h3>Application Rules</h3>
+          <p>
+            Define min/max replicas, scale thresholds, holiday shutdowns, and
+            off-hours stop windows for each project and component.
+          </p>
+        </article>
 
-            <label>
-              Component
-              <input id="policyComponent" value="payments-api" required />
-            </label>
+        <article class="feature-card">
+          <span class="feature-number">04</span>
+          <h3>Endpoint Configuration</h3>
+          <p>
+            Configure the Auto Healer endpoint and ADFS authentication inputs:
+            client ID, server ID, username, and password status.
+          </p>
+        </article>
 
-            <label>
-              Min Replicas
-              <input id="minReplicas" min="0" step="1" type="number" value="1" />
-            </label>
+        <article class="feature-card">
+          <span class="feature-number">05</span>
+          <h3>Immutable Audit Trail</h3>
+          <p>
+            Record policy and endpoint configuration changes in SQLite with
+            database triggers that reject updates and deletes.
+          </p>
+        </article>
 
-            <label>
-              Max Replicas
-              <input id="maxReplicas" min="0" step="1" type="number" value="6" />
-            </label>
+        <article class="feature-card">
+          <span class="feature-number">06</span>
+          <h3>SRE Postmortems</h3>
+          <p>
+            Manage blameless postmortems and RCA records with incident impact,
+            root cause, corrective actions, lessons learned, status, and owner.
+          </p>
+        </article>
 
-            <label>
-              Scale Up Threshold %
-              <input id="scaleUpThreshold" min="0" max="100" step="1" type="number" value="80" />
-            </label>
-
-            <label>
-              Scale Down Threshold %
-              <input id="scaleDownThreshold" min="0" max="100" step="1" type="number" value="25" />
-            </label>
-
-            <label>
-              Off-hours Start
-              <input id="offHoursStart" type="time" value="20:00" />
-            </label>
-
-            <label>
-              Off-hours End
-              <input id="offHoursEnd" type="time" value="06:00" />
-            </label>
-
-            <label class="check-field">
-              <input id="stopDuringOffHours" type="checkbox" checked />
-              Stop application during off hours
-            </label>
-
-            <label class="check-field">
-              <input id="stopDuringHolidays" type="checkbox" />
-              Stop application during holidays
-            </label>
-
-            <label class="wide-field">
-              Holiday Calendar
-              <textarea id="holidayCalendar" rows="3">2026-01-01 New Year
-2026-12-25 Christmas</textarea>
-            </label>
-
-            <div class="form-actions">
-              <button type="submit">Save Policy</button>
-              <span id="policyStatus" role="status"></span>
-            </div>
-          </form>
-        </div>
-
-        <div class="panel policies-panel">
-          <div class="panel-header">
-            <div>
-              <h2>Saved Policies</h2>
-              <p>Current control settings by project and component.</p>
-            </div>
-            <button id="policyRefreshButton" type="button">Refresh</button>
-          </div>
-          <div id="policiesList" class="policies-list"></div>
-        </div>
+        <article class="feature-card">
+          <span class="feature-number">07</span>
+          <h3>API Documentation</h3>
+          <p>
+            Explore the OpenAPI contract through Swagger, the local documentation
+            page, or the machine-readable <code>/openapi.json</code> endpoint.
+          </p>
+        </article>
       </section>
 
-      <section class="presentation" aria-label="Event presentation">
-        <div class="metrics" id="metrics"></div>
-
-        <div class="panel events-panel">
-          <div class="panel-header events-header">
+      <section class="dashboard-routes" aria-label="Key routes">
+        <div class="panel">
+          <div class="panel-header">
             <div>
-              <h2>Stored Events</h2>
-              <p>Latest ingested events by project and component.</p>
-            </div>
-            <div class="filters">
-              <input id="projectFilter" placeholder="Project ID" aria-label="Filter by project ID" />
-              <input id="componentFilter" placeholder="Component" aria-label="Filter by component" />
-              <button id="refreshButton" type="button">Refresh</button>
+              <h2>Start Here</h2>
+              <p>Core pages and APIs for operating Auto Healer.</p>
             </div>
           </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Project</th>
-                  <th>Component</th>
-                  <th>Source</th>
-                  <th>Severity</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody id="eventsTable"></tbody>
-            </table>
+          <div class="route-list">
+            <a href="/console"><strong>/console</strong><span>Mock events, policies, audit trail, and stored events</span></a>
+            <a href="/configuration"><strong>/configuration</strong><span>Auto Healer endpoint and ADFS settings</span></a>
+            <a href="/docs"><strong>/docs</strong><span>Swagger UI for API exploration</span></a>
+            <a href="/documentation"><strong>/documentation</strong><span>Readable API usage guide</span></a>
+            <a href="/audit-log"><strong>/audit-log</strong><span>Immutable audit records as JSON</span></a>
           </div>
         </div>
       </section>
     </main>
 
-    <script src="/app.js"></script>
+    <script>
+      fetch("/health")
+        .then((response) => {
+          if (!response.ok) throw new Error("offline");
+          const status = document.querySelector("#dashboardHealth");
+          status.textContent = "Service online";
+          status.classList.add("ok");
+        })
+        .catch(() => {
+          document.querySelector("#dashboardHealth").textContent = "Service offline";
+        });
+    </script>
   </body>
 </html>
