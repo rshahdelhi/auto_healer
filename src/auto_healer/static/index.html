@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Dashboard</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar dashboard-topbar">
+      <div class="brand-heading">
+        <a class="brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="brand-mark">AH</span>
+          <span>
+            <span class="brand-name">Auto Healer</span>
+            <span class="brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
+        <h1>Distributed Systems Recovery Dashboard</h1>
+      </div>
+      <div class="topbar-actions">
+        <nav class="topnav">
+          <a href="/console">Console</a>
+          <a href="/configuration">Configuration</a>
+          <a href="/docs">Swagger</a>
+        </nav>
+        <div class="status-pill" id="dashboardHealth">Checking service</div>
+      </div>
+    </header>
+
+    <main class="shell dashboard-shell">
+      <section class="dashboard-hero" aria-label="Auto Healer overview">
+        <div class="dashboard-hero-copy">
+          <p class="eyebrow">Auto Healer Control Plane</p>
+          <h2>Turn monitoring signals into controlled recovery decisions.</h2>
+          <p>
+            Auto Healer accepts alerts from Dynatrace, Splunk, Phoenix, ADFS, and
+            other monitoring systems, stores each event by project and component,
+            and gives operations teams a policy-driven interface for scale and
+            shutdown decisions.
+          </p>
+          <div class="dashboard-actions">
+            <a class="primary-link" href="/console">Open Operator Console</a>
+            <a class="secondary-link" href="/configuration">Configure Endpoint</a>
+          </div>
+        </div>
+        <div class="dashboard-snapshot" aria-label="Dashboard summary">
+          <div class="snapshot-row">
+            <span>Sources</span>
+            <strong>Dynatrace, Splunk, Phoenix, ADFS</strong>
+          </div>
+          <div class="snapshot-row">
+            <span>Controls</span>
+            <strong>Scale up, scale down, stop windows</strong>
+          </div>
+          <div class="snapshot-row">
+            <span>Governance</span>
+            <strong>Immutable audit log and blameless RCA</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid" aria-label="Tool features">
+        <article class="feature-card">
+          <span class="feature-number">01</span>
+          <h3>Monitoring Event Intake</h3>
+          <p>
+            Receive HTTP POST events from monitoring systems and preserve the full
+            provider payload while normalizing project, component, source, severity,
+            title, and message fields.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <h3>Mock Scenario Console</h3>
+          <p>
+            Generate test events for Dynatrace, Splunk, Phoenix, ADFS error surge,
+            capacity scale up, capacity scale down, and off-hours stop workflows.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <h3>Application Rules</h3>
+          <p>
+            Define min/max replicas, scale thresholds, holiday shutdowns, and
+            off-hours stop windows for each project and component.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">04</span>
+          <h3>Endpoint Configuration</h3>
+          <p>
+            Configure the Auto Healer endpoint and ADFS authentication inputs:
+            client ID, server ID, username, and password status.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">05</span>
+          <h3>Immutable Audit Trail</h3>
+          <p>
+            Record policy and endpoint configuration changes in SQLite with
+            database triggers that reject updates and deletes.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">06</span>
+          <h3>SRE Postmortems</h3>
+          <p>
+            Manage blameless postmortems and RCA records with incident impact,
+            root cause, corrective actions, lessons learned, status, and owner.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <span class="feature-number">07</span>
+          <h3>API Documentation</h3>
+          <p>
+            Explore the OpenAPI contract through Swagger, the local documentation
+            page, or the machine-readable <code>/openapi.json</code> endpoint.
+          </p>
+        </article>
+      </section>
+
+      <section class="dashboard-routes" aria-label="Key routes">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Start Here</h2>
+              <p>Core pages and APIs for operating Auto Healer.</p>
+            </div>
+          </div>
+          <div class="route-list">
+            <a href="/console"><strong>/console</strong><span>Mock events, policies, audit trail, and stored events</span></a>
+            <a href="/configuration"><strong>/configuration</strong><span>Auto Healer endpoint and ADFS settings</span></a>
+            <a href="/docs"><strong>/docs</strong><span>Swagger UI for API exploration</span></a>
+            <a href="/documentation"><strong>/documentation</strong><span>Readable API usage guide</span></a>
+            <a href="/audit-log"><strong>/audit-log</strong><span>Immutable audit records as JSON</span></a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      fetch("/health")
+        .then((response) => {
+          if (!response.ok) throw new Error("offline");
+          const status = document.querySelector("#dashboardHealth");
+          status.textContent = "Service online";
+          status.classList.add("ok");
+        })
+        .catch(() => {
+          document.querySelector("#dashboardHealth").textContent = "Service offline";
+        });
+    </script>
+  </body>
+</html>

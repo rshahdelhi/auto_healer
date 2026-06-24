@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Configuration</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-heading">
+        <a class="brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="brand-mark">AH</span>
+          <span>
+            <span class="brand-name">Auto Healer</span>
+            <span class="brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
+        <h1>Endpoint Configuration</h1>
+      </div>
+      <nav class="topnav">
+        <a href="/">Dashboard</a>
+        <a href="/console">Console</a>
+        <a href="/docs">Swagger</a>
+        <a href="/documentation">Docs</a>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <section class="config-layout" aria-label="Auto Healer endpoint configuration">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Auto Healer Endpoint</h2>
+              <p>Configure the service endpoint and ADFS credentials used for authentication.</p>
+            </div>
+          </div>
+
+          <form id="configForm" class="config-form">
+            <label class="wide-field">
+              Endpoint URL
+              <input id="endpointUrl" placeholder="https://auto-healer.example.com/api" required />
+            </label>
+
+            <label>
+              Authentication
+              <select id="authType">
+                <option value="adfs">ADFS</option>
+              </select>
+            </label>
+
+            <label>
+              Client ID
+              <input id="adfsClientId" autocomplete="off" required />
+            </label>
+
+            <label>
+              Server ID
+              <input id="adfsServerId" autocomplete="off" required />
+            </label>
+
+            <label>
+              User Name
+              <input id="adfsUsername" autocomplete="username" required />
+            </label>
+
+            <label class="wide-field">
+              Password
+              <input id="adfsPassword" autocomplete="current-password" type="password" />
+            </label>
+
+            <label class="check-field">
+              <input id="retryEnabled" type="checkbox" checked />
+              Enable retries for endpoint calls
+            </label>
+
+            <label class="check-field">
+              <input id="circuitBreakerEnabled" type="checkbox" checked />
+              Enable circuit breaker protection
+            </label>
+
+            <label>
+              Max Retry Attempts
+              <input id="maxRetryAttempts" min="0" step="1" type="number" value="3" />
+            </label>
+
+            <label>
+              Retry Backoff Seconds
+              <input id="retryBackoffSeconds" min="0" step="1" type="number" value="2" />
+            </label>
+
+            <label>
+              Failure Threshold
+              <input id="circuitBreakerFailureThreshold" min="1" step="1" type="number" value="5" />
+            </label>
+
+            <label>
+              Reset Timeout Seconds
+              <input id="circuitBreakerResetTimeoutSeconds" min="1" step="1" type="number" value="60" />
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Save Configuration</button>
+              <span id="configStatus" role="status"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Current Configuration</h2>
+              <p>Password status is shown without exposing the secret.</p>
+            </div>
+          </div>
+          <div id="configSummary" class="config-summary"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Configuration Audit</h2>
+              <p>Recent endpoint configuration changes.</p>
+            </div>
+            <button id="configAuditRefreshButton" type="button">Refresh</button>
+          </div>
+          <div id="configAuditList" class="audit-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/configuration.js"></script>
+  </body>
+</html>

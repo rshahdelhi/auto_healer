@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Swagger</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <style>
+      body {
+        margin: 0;
+        background: #f6f7f9;
+      }
+
+      .swagger-topbar {
+        align-items: center;
+        background: #17202a;
+        color: #ffffff;
+        display: flex;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        gap: 16px;
+        justify-content: space-between;
+        padding: 14px 24px;
+      }
+
+      .swagger-topbar a {
+        color: #a7f3d0;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .swagger-brand {
+        align-items: center;
+        color: #ffffff;
+        display: inline-flex;
+        gap: 10px;
+        text-decoration: none;
+      }
+
+      .swagger-mark {
+        align-items: center;
+        background: #0f766e;
+        border: 1px solid #5eead4;
+        border-radius: 8px;
+        color: #ffffff;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 900;
+        height: 38px;
+        justify-content: center;
+        width: 38px;
+      }
+
+      .swagger-brand-text {
+        display: grid;
+        gap: 2px;
+      }
+
+      .swagger-brand-text span {
+        color: #a7f3d0;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      #swagger-ui {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="swagger-topbar">
+      <a class="swagger-brand" href="/">
+        <span class="swagger-mark">AH</span>
+        <strong class="swagger-brand-text">Auto Healer <span>Swagger API</span></strong>
+      </a>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/console">Console</a>
+        <a href="/documentation">Documentation</a>
+        <a href="/openapi.json">OpenAPI JSON</a>
+      </nav>
+    </header>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.addEventListener("load", () => {
+        SwaggerUIBundle({
+          url: "/openapi.json",
+          dom_id: "#swagger-ui",
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: "BaseLayout",
+        });
+      });
+    </script>
+  </body>
+</html>
