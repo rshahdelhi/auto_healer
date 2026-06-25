@@ -54,7 +54,7 @@ jobs:
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.ocker_hub_Cred }}
 
       - name: Build Docker image for pull request
         if: github.event_name == 'pull_request'
