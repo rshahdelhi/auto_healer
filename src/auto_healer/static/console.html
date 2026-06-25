@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Healer Console</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-heading">
+        <a class="brand-lockup" href="/" aria-label="Auto Healer dashboard">
+          <span class="brand-mark">AH</span>
+          <span>
+            <span class="brand-name">Auto Healer</span>
+            <span class="brand-tagline">Resilience Operations</span>
+          </span>
+        </a>
+        <h1>Monitoring Event Console</h1>
+      </div>
+      <div class="topbar-actions">
+        <nav class="topnav">
+          <a href="/">Dashboard</a>
+          <a href="/configuration">Configuration</a>
+          <a href="/docs">Swagger</a>
+        </nav>
+        <div class="status-pill" id="healthStatus">Checking service</div>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="workspace" aria-label="Mock monitoring event">
+        <div class="panel mock-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Mock Event</h2>
+              <p>Generate provider-shaped payloads for ingestion testing.</p>
+            </div>
+            <button class="icon-button" id="randomizeButton" title="Randomize mock data" type="button">
+              <span aria-hidden="true">↻</span>
+              <span class="sr-only">Randomize mock data</span>
+            </button>
+          </div>
+
+          <form id="eventForm" class="event-form">
+            <label>
+              Source
+              <select id="source" name="source">
+                <option value="dynatrace">Dynatrace</option>
+                <option value="splunk">Splunk</option>
+                <option value="splunk_system">Splunk System Error</option>
+                <option value="splunk_application">Splunk Application Error</option>
+                <option value="phoenix">Phoenix</option>
+                <option value="generic">Generic</option>
+                <option value="adfs">ADFS Error Surge</option>
+                <option value="capacity_up">Capacity Scale Up</option>
+                <option value="capacity_down">Capacity Scale Down</option>
+                <option value="off_hours">Off-hours Stop</option>
+              </select>
+            </label>
+
+            <label>
+              Project ID
+              <input id="projectId" name="projectId" value="checkout" />
+            </label>
+
+            <label>
+              Project Name
+              <input id="projectName" name="projectName" value="Checkout" />
+            </label>
+
+            <label>
+              Component
+              <input id="component" name="component" value="payments-api" required />
+            </label>
+
+            <label>
+              Severity
+              <select id="severity" name="severity">
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+              </select>
+            </label>
+
+            <label class="wide-field">
+              Message
+              <textarea id="message" name="message" rows="4">p95 latency crossed threshold</textarea>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Send Mock Event</button>
+              <span id="submitStatus" role="status"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel payload-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Payload Preview</h2>
+              <p>Provider-specific fields are preserved in SQLite.</p>
+            </div>
+          </div>
+          <pre id="payloadPreview" aria-label="Payload preview"></pre>
+        </div>
+      </section>
+
+      <section class="policy-workspace" aria-label="Application scaling policy">
+        <div class="panel policy-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Application Policy</h2>
+              <p>Set scale limits and stop windows for holidays or off hours.</p>
+            </div>
+          </div>
+
+          <form id="policyForm" class="policy-form">
+            <label>
+              Project ID
+              <input id="policyProjectId" value="checkout" />
+            </label>
+
+            <label>
+              Project Name
+              <input id="policyProjectName" value="Checkout" />
+            </label>
+
+            <label>
+              Component
+              <input id="policyComponent" value="payments-api" required />
+            </label>
+
+            <label>
+              Min Replicas
+              <input id="minReplicas" min="0" step="1" type="number" value="1" />
+            </label>
+
+            <label>
+              Max Replicas
+              <input id="maxReplicas" min="0" step="1" type="number" value="6" />
+            </label>
+
+            <label>
+              Scale Up Threshold %
+              <input id="scaleUpThreshold" min="0" max="100" step="1" type="number" value="80" />
+            </label>
+
+            <label>
+              Scale Down Threshold %
+              <input id="scaleDownThreshold" min="0" max="100" step="1" type="number" value="25" />
+            </label>
+
+            <label>
+              Off-hours Start
+              <input id="offHoursStart" type="time" value="20:00" />
+            </label>
+
+            <label>
+              Off-hours End
+              <input id="offHoursEnd" type="time" value="06:00" />
+            </label>
+
+            <label class="check-field">
+              <input id="stopDuringOffHours" type="checkbox" checked />
+              Stop application during off hours
+            </label>
+
+            <label class="check-field">
+              <input id="stopDuringHolidays" type="checkbox" />
+              Stop application during holidays
+            </label>
+
+            <label class="wide-field">
+              Holiday Calendar
+              <textarea id="holidayCalendar" rows="3">2026-01-01 New Year
+2026-12-25 Christmas</textarea>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Save Policy</button>
+              <span id="policyStatus" role="status"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel policies-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Saved Policies</h2>
+              <p>Current control settings by project and component.</p>
+            </div>
+            <button id="policyRefreshButton" type="button">Refresh</button>
+          </div>
+          <div id="policiesList" class="policies-list"></div>
+        </div>
+      </section>
+
+      <section class="sre-workspace" aria-label="SRE postmortem and RCA management">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Blameless Postmortem and RCA</h2>
+              <p>Capture incident learnings, root cause, impact, and corrective actions.</p>
+            </div>
+          </div>
+
+          <form id="postmortemForm" class="postmortem-form">
+            <label>
+              Incident ID
+              <input id="incidentId" value="INC-2026-0001" required />
+            </label>
+
+            <label>
+              Status
+              <select id="postmortemStatus">
+                <option value="draft">Draft</option>
+                <option value="in_review">In Review</option>
+                <option value="published">Published</option>
+              </select>
+            </label>
+
+            <label>
+              Project ID
+              <input id="postmortemProjectId" value="checkout" />
+            </label>
+
+            <label>
+              Project Name
+              <input id="postmortemProjectName" value="Checkout" />
+            </label>
+
+            <label>
+              Component
+              <input id="postmortemComponent" value="payments-api" required />
+            </label>
+
+            <label>
+              Severity
+              <select id="postmortemSeverity">
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+              </select>
+            </label>
+
+            <label>
+              Owner
+              <input id="postmortemOwner" value="sre-team" />
+            </label>
+
+            <label class="wide-field">
+              Title
+              <input id="postmortemTitle" value="Payment authorization error surge" required />
+            </label>
+
+            <label class="wide-field">
+              Summary
+              <textarea id="postmortemSummary" rows="3">A payment authorization error surge increased checkout failures for a subset of users.</textarea>
+            </label>
+
+            <label class="wide-field">
+              Customer Impact
+              <textarea id="postmortemImpact" rows="3">Checkout conversion dropped while the payment provider retry path was saturated.</textarea>
+            </label>
+
+            <label class="wide-field">
+              Root Cause
+              <textarea id="postmortemRootCause" rows="3">A downstream payment provider timeout caused retry amplification in payments-api.</textarea>
+            </label>
+
+            <label class="wide-field">
+              Corrective Actions
+              <textarea id="postmortemActions" rows="3">Tune retry limits, add provider-specific circuit breaker, and improve alert routing.</textarea>
+            </label>
+
+            <label class="wide-field">
+              Lessons Learned
+              <textarea id="postmortemLessons" rows="3">Retries need per-provider budgets and SRE runbooks should include fallback validation.</textarea>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit">Save Postmortem</button>
+              <span id="postmortemStatusText" role="status"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>SRE Review Queue</h2>
+              <p>Recent blameless postmortems and RCA records.</p>
+            </div>
+            <button id="postmortemRefreshButton" type="button">Refresh</button>
+          </div>
+          <div id="postmortemsList" class="postmortems-list"></div>
+        </div>
+      </section>
+
+      <section class="presentation" aria-label="Event presentation">
+        <div class="metrics" id="metrics"></div>
+
+        <div class="panel audit-panel">
+          <div class="panel-header events-header">
+            <div>
+              <h2>Audit Trail</h2>
+              <p>Rule and configuration changes recorded by Auto Healer.</p>
+            </div>
+            <button id="auditRefreshButton" type="button">Refresh</button>
+          </div>
+          <div id="auditList" class="audit-list"></div>
+        </div>
+
+        <div class="panel events-panel">
+          <div class="panel-header events-header">
+            <div>
+              <h2>Stored Events</h2>
+              <p>Latest ingested events by project and component.</p>
+            </div>
+            <div class="filters">
+              <input id="projectFilter" placeholder="Project ID" aria-label="Filter by project ID" />
+              <input id="componentFilter" placeholder="Component" aria-label="Filter by component" />
+              <button id="refreshButton" type="button">Refresh</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Project</th>
+                  <th>Component</th>
+                  <th>Source</th>
+                  <th>Severity</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody id="eventsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
