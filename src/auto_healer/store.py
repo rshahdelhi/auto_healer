@@ -89,6 +89,24 @@ class Postmortem:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class SkillExecution:
+    id: int
+    skill_name: str
+    project_id: str | None
+    project_name: str | None
+    component: str
+    autonomy_level: int
+    dry_run: bool
+    approved: bool
+    risk_level: str
+    status: str
+    reason: str
+    proposal: dict[str, Any]
+    evidence: dict[str, Any]
+    created_at: str
+
+
 class EventStore:
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = str(db_path)
@@ -220,6 +238,32 @@ class EventStore:
                 """
                 CREATE INDEX IF NOT EXISTS idx_audit_log_entity
                 ON audit_log(entity_type, entity_id, created_at)
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS skill_executions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    skill_name TEXT NOT NULL,
+                    project_id TEXT,
+                    project_name TEXT,
+                    component TEXT NOT NULL,
+                    autonomy_level INTEGER NOT NULL,
+                    dry_run INTEGER NOT NULL,
+                    approved INTEGER NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    proposal TEXT NOT NULL,
+                    evidence TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_skill_executions_project_component
+                ON skill_executions(project_id, project_name, component, created_at)
                 """
             )
             conn.execute(
@@ -834,6 +878,129 @@ class EventStore:
 
         return [_row_to_postmortem(row) for row in rows]
 
+    def record_skill_execution(
+        self,
+        *,
+        skill_name: str,
+        project_id: str | None,
+        project_name: str | None,
+        component: str,
+        autonomy_level: int,
+        dry_run: bool,
+        approved: bool,
+        risk_level: str,
+        status: str,
+        reason: str,
+        proposal: dict[str, Any],
+        evidence: dict[str, Any],
+    ) -> SkillExecution:
+        created_at = datetime.now(timezone.utc).isoformat()
+        proposal_json = json.dumps(proposal, sort_keys=True, separators=(",", ":"))
+        evidence_json = json.dumps(evidence, sort_keys=True, separators=(",", ":"))
+
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO skill_executions (
+                    skill_name,
+                    project_id,
+                    project_name,
+                    component,
+                    autonomy_level,
+                    dry_run,
+                    approved,
+                    risk_level,
+                    status,
+                    reason,
+                    proposal,
+                    evidence,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    skill_name,
+                    project_id,
+                    project_name,
+                    component,
+                    autonomy_level,
+                    int(dry_run),
+                    int(approved),
+                    risk_level,
+                    status,
+                    reason,
+                    proposal_json,
+                    evidence_json,
+                    created_at,
+                ),
+            )
+            execution_id = int(cursor.lastrowid)
+
+        execution = SkillExecution(
+            id=execution_id,
+            skill_name=skill_name,
+            project_id=project_id,
+            project_name=project_name,
+            component=component,
+            autonomy_level=autonomy_level,
+            dry_run=dry_run,
+            approved=approved,
+            risk_level=risk_level,
+            status=status,
+            reason=reason,
+            proposal=proposal,
+            evidence=evidence,
+            created_at=created_at,
+        )
+        self.record_audit(
+            entity_type="skill_execution",
+            entity_id=str(execution.id),
+            action=status,
+            summary=f"Skill {skill_name} recorded for {project_id or project_name}/{component}",
+            details=_skill_execution_audit_details(execution),
+        )
+        return execution
+
+    def list_skill_executions(
+        self,
+        *,
+        skill_name: str | None = None,
+        project_id: str | None = None,
+        project_name: str | None = None,
+        component: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[SkillExecution]:
+        query = "SELECT * FROM skill_executions"
+        filters: list[str] = []
+        params: list[Any] = []
+
+        if skill_name:
+            filters.append("skill_name = ?")
+            params.append(skill_name)
+        if project_id:
+            filters.append("project_id = ?")
+            params.append(project_id)
+        if project_name:
+            filters.append("project_name = ?")
+            params.append(project_name)
+        if component:
+            filters.append("component = ?")
+            params.append(component)
+        if status:
+            filters.append("status = ?")
+            params.append(status)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        query += " ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+        return [_row_to_skill_execution(row) for row in rows]
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -975,6 +1142,25 @@ def _row_to_postmortem(row: sqlite3.Row) -> Postmortem:
     )
 
 
+def _row_to_skill_execution(row: sqlite3.Row) -> SkillExecution:
+    return SkillExecution(
+        id=row["id"],
+        skill_name=row["skill_name"],
+        project_id=row["project_id"],
+        project_name=row["project_name"],
+        component=row["component"],
+        autonomy_level=row["autonomy_level"],
+        dry_run=bool(row["dry_run"]),
+        approved=bool(row["approved"]),
+        risk_level=row["risk_level"],
+        status=row["status"],
+        reason=row["reason"],
+        proposal=json.loads(row["proposal"]),
+        evidence=json.loads(row["evidence"]),
+        created_at=row["created_at"],
+    )
+
+
 def _policy_entity_id(policy: AppPolicy) -> str:
     project = policy.project_id or policy.project_name or "unknown"
     return f"{project}:{policy.component}"
@@ -1031,4 +1217,21 @@ def _postmortem_audit_details(postmortem: Postmortem) -> dict[str, Any]:
         "root_cause": postmortem.root_cause,
         "corrective_actions": postmortem.corrective_actions,
         "lessons_learned": postmortem.lessons_learned,
+    }
+
+
+def _skill_execution_audit_details(execution: SkillExecution) -> dict[str, Any]:
+    return {
+        "skill_name": execution.skill_name,
+        "project_id": execution.project_id,
+        "project_name": execution.project_name,
+        "component": execution.component,
+        "autonomy_level": execution.autonomy_level,
+        "dry_run": execution.dry_run,
+        "approved": execution.approved,
+        "risk_level": execution.risk_level,
+        "status": execution.status,
+        "reason": execution.reason,
+        "proposal": execution.proposal,
+        "evidence": execution.evidence,
     }

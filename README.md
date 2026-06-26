@@ -67,6 +67,32 @@ The UI includes:
 - immutable audit trail for policy/rule and endpoint configuration changes
 - SRE blameless postmortem and RCA management
 
+## Reliable AI operations model
+
+Auto Healer follows the Google SRE AI operations guidance by keeping healing
+actions skill based, observable, and safe by default:
+
+- skills are registered as bounded capabilities such as `scale_up`,
+  `scale_down`, and `restart_component`
+- every skill run creates a deterministic proposal with rollback metadata
+- `dry_run` defaults to `true` so operators can inspect blast radius before any
+  production change
+- non-dry-run requests require explicit approval at L1/L2 autonomy
+- autonomy levels above a skill guardrail are blocked and audited
+- every skill run is written to `skill_executions` and mirrored into the
+  immutable `audit_log`
+- OpenTelemetry spans are emitted for event ingestion and skill execution
+
+The relevant SRE principles are transparency, real-time risk evaluation,
+progressive authorization, least privilege, circuit breakers, and mandatory
+dry-run support.
+
+Enable OTLP trace export by setting:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/v1/traces
+```
+
 ## Send an event
 
 ```bash
@@ -207,6 +233,38 @@ curl 'http://127.0.0.1:8080/audit-log?entity_type=policy&limit=25'
 
 Audit entries are append-only records in SQLite. Database triggers reject updates
 and deletes on `audit_log`.
+
+## Run auto-healing skills
+
+List skills:
+
+```bash
+curl http://127.0.0.1:8080/skills
+```
+
+Dry-run a scale-up proposal:
+
+```bash
+curl -X POST http://127.0.0.1:8080/skills/run \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "skill": "scale_up",
+    "project_id": "checkout",
+    "component": "payments-api",
+    "current_replicas": 2,
+    "max_replicas": 6,
+    "dry_run": true,
+    "autonomy_level": 1,
+    "event_id": 42,
+    "reason": "p95 latency crossed threshold"
+  }'
+```
+
+Query skill execution records:
+
+```bash
+curl 'http://127.0.0.1:8080/skill-executions?project_id=checkout'
+```
 
 ## Save blameless postmortem and RCA
 

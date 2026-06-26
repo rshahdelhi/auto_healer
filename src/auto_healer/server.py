@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from auto_healer.openapi import build_openapi_schema
+from auto_healer.skills import list_skills, run_skill
 from auto_healer.store import (
     AppPolicy,
     AuditEntry,
@@ -17,7 +18,9 @@ from auto_healer.store import (
     Event,
     EventStore,
     Postmortem,
+    SkillExecution,
 )
+from auto_healer.telemetry import configure_telemetry, start_span
 
 DEFAULT_DB_PATH = "auto_healer.sqlite3"
 DEFAULT_HOST = "127.0.0.1"
@@ -137,6 +140,30 @@ def create_handler(store: EventStore) -> type[BaseHTTPRequestHandler]:
                 )
                 return
 
+            if parsed.path == "/skills":
+                self._send_json({"skills": [_skill_to_dict(skill) for skill in list_skills()]})
+                return
+
+            if parsed.path == "/skill-executions":
+                params = parse_qs(parsed.query)
+                executions = store.list_skill_executions(
+                    skill_name=_first(params, "skill_name"),
+                    project_id=_first(params, "project_id"),
+                    project_name=_first(params, "project_name"),
+                    component=_first(params, "component"),
+                    status=_first(params, "status"),
+                    limit=_int_param(params, "limit", default=100),
+                )
+                self._send_json(
+                    {
+                        "skill_executions": [
+                            _skill_execution_to_dict(execution)
+                            for execution in executions
+                        ]
+                    }
+                )
+                return
+
             self._send_error(HTTPStatus.NOT_FOUND, "not found")
 
         def do_POST(self) -> None:
@@ -147,14 +174,33 @@ def create_handler(store: EventStore) -> type[BaseHTTPRequestHandler]:
                 "/policies",
                 "/endpoint-config",
                 "/postmortems",
+                "/skills/run",
             }:
                 self._send_error(HTTPStatus.NOT_FOUND, "not found")
                 return
 
             try:
                 payload = self._read_json_body()
+                if path == "/skills/run":
+                    execution = run_skill(store, payload)
+                    logger.info(
+                        "skill_execution id=%s skill=%s project=%s component=%s status=%s dry_run=%s",
+                        execution.id,
+                        execution.skill_name,
+                        execution.project_id or execution.project_name,
+                        execution.component,
+                        execution.status,
+                        execution.dry_run,
+                    )
+                    self._send_json(
+                        _skill_execution_to_dict(execution),
+                        status=HTTPStatus.CREATED,
+                    )
+                    return
+
                 if path == "/events":
-                    event = store.create_event(payload)
+                    with start_span("auto_healer.event.create", source=payload.get("source")):
+                        event = store.create_event(payload)
                     logger.info(
                         "event_ingested id=%s project=%s component=%s source=%s",
                         event.id,
@@ -280,6 +326,7 @@ def run_server(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    configure_telemetry()
     store = EventStore(db_path)
     server = ThreadingHTTPServer((host, port), create_handler(store))
     logger.info("auto_healer_listening url=http://%s:%s db_path=%s", host, port, db_path)
@@ -411,6 +458,33 @@ def _postmortem_to_dict(postmortem: Postmortem) -> dict[str, Any]:
         "lessons_learned": postmortem.lessons_learned,
         "created_at": postmortem.created_at,
         "updated_at": postmortem.updated_at,
+    }
+
+
+def _skill_to_dict(skill: Any) -> dict[str, Any]:
+    return {
+        "name": skill.name,
+        "description": skill.description,
+        "max_autonomy_level": int(skill.max_autonomy_level),
+    }
+
+
+def _skill_execution_to_dict(execution: SkillExecution) -> dict[str, Any]:
+    return {
+        "id": execution.id,
+        "skill_name": execution.skill_name,
+        "project_id": execution.project_id,
+        "project_name": execution.project_name,
+        "component": execution.component,
+        "autonomy_level": execution.autonomy_level,
+        "dry_run": execution.dry_run,
+        "approved": execution.approved,
+        "risk_level": execution.risk_level,
+        "status": execution.status,
+        "reason": execution.reason,
+        "proposal": execution.proposal,
+        "evidence": execution.evidence,
+        "created_at": execution.created_at,
     }
 
 

@@ -7,7 +7,11 @@ authors = [
     { name = "Anya", email = "anya.shah21@gmail.com" }
 ]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "opentelemetry-api>=1.39.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.39.1",
+    "opentelemetry-sdk>=1.39.1",
+]
 
 [project.scripts]
 auto-healer = "auto_healer:main"

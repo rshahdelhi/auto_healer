@@ -126,6 +126,9 @@ def test_get_openapi_schema(tmp_path):
     assert "/endpoint-config" in body["paths"]
     assert "/audit-log" in body["paths"]
     assert "/postmortems" in body["paths"]
+    assert "/skills" in body["paths"]
+    assert "/skills/run" in body["paths"]
+    assert "/skill-executions" in body["paths"]
 
 
 def test_get_docs_pages(tmp_path):
@@ -416,3 +419,45 @@ def test_post_postmortem_persists_rca(tmp_path):
     assert get_response.status == HTTPStatus.OK
     assert len(get_body["postmortems"]) == 1
     assert store.list_audit_entries(entity_type="postmortem")[0].action == "created"
+
+
+def test_post_skill_run_records_guarded_proposal(tmp_path):
+    store = EventStore(tmp_path / "events.sqlite3")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(store))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        conn = HTTPConnection("127.0.0.1", server.server_port)
+        conn.request(
+            "POST",
+            "/skills/run",
+            body=json.dumps(
+                {
+                    "skill": "scale_up",
+                    "project_id": "checkout",
+                    "component": "payments-api",
+                    "current_replicas": 2,
+                    "max_replicas": 6,
+                    "event_id": 42,
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read())
+
+        conn.request("GET", "/skill-executions?project_id=checkout")
+        get_response = conn.getresponse()
+        get_body = json.loads(get_response.read())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert response.status == HTTPStatus.CREATED
+    assert body["skill_name"] == "scale_up"
+    assert body["status"] == "dry_run"
+    assert body["proposal"]["target_replicas"] == 3
+    assert get_response.status == HTTPStatus.OK
+    assert len(get_body["skill_executions"]) == 1

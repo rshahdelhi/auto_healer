@@ -562,6 +562,116 @@ def build_openapi_schema() -> dict[str, Any]:
                     },
                 },
             },
+            "/skills": {
+                "get": {
+                    "summary": "List available auto-healing skills",
+                    "description": (
+                        "Returns bounded operational skills with their maximum "
+                        "supported autonomy level."
+                    ),
+                    "responses": {
+                        "200": {
+                            "description": "Registered skills.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "skills": {
+                                                "type": "array",
+                                                "items": {"$ref": "#/components/schemas/Skill"},
+                                            }
+                                        },
+                                        "required": ["skills"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/skills/run": {
+                "post": {
+                    "summary": "Run an auto-healing skill through guardrails",
+                    "description": (
+                        "Generates a deterministic skill proposal, applies autonomy "
+                        "and approval guardrails, records an immutable audit entry, "
+                        "and defaults to dry-run execution."
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/SkillRunInput"},
+                                "example": {
+                                    "skill": "scale_up",
+                                    "project_id": "checkout",
+                                    "component": "payments-api",
+                                    "current_replicas": 2,
+                                    "max_replicas": 6,
+                                    "dry_run": True,
+                                    "autonomy_level": 1,
+                                    "event_id": 42,
+                                    "reason": "p95 latency crossed threshold",
+                                },
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Skill execution recorded.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SkillExecution"
+                                    }
+                                }
+                            },
+                        },
+                        "400": {
+                            "description": "Invalid skill request.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Error"}
+                                }
+                            },
+                        },
+                    },
+                }
+            },
+            "/skill-executions": {
+                "get": {
+                    "summary": "List skill execution records",
+                    "parameters": [
+                        {"name": "skill_name", "in": "query", "schema": {"type": "string"}},
+                        {"name": "project_id", "in": "query", "schema": {"type": "string"}},
+                        {"name": "project_name", "in": "query", "schema": {"type": "string"}},
+                        {"name": "component", "in": "query", "schema": {"type": "string"}},
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Skill execution records.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "skill_executions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "$ref": "#/components/schemas/SkillExecution"
+                                                },
+                                            }
+                                        },
+                                        "required": ["skill_executions"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
         },
         "components": {
             "schemas": {
@@ -791,7 +901,7 @@ def build_openapi_schema() -> dict[str, Any]:
                         "id": {"type": "integer"},
                         "entity_type": {"type": "string"},
                         "entity_id": {"type": "string"},
-                        "action": {"type": "string", "enum": ["created", "updated"]},
+                        "action": {"type": "string"},
                         "summary": {"type": "string"},
                         "details": {"type": "object", "additionalProperties": True},
                         "created_at": {"type": "string", "format": "date-time"},
@@ -848,6 +958,73 @@ def build_openapi_schema() -> dict[str, Any]:
                             "required": ["id", "created_at", "updated_at"],
                         },
                     ]
+                },
+                "Skill": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "max_autonomy_level": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4,
+                        },
+                    },
+                    "required": ["name", "description", "max_autonomy_level"],
+                },
+                "SkillRunInput": {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "properties": {
+                        "skill": {"type": "string"},
+                        "project_id": {"type": "string"},
+                        "project_name": {"type": "string"},
+                        "component": {"type": "string"},
+                        "dry_run": {"type": "boolean", "default": True},
+                        "approved": {"type": "boolean", "default": False},
+                        "autonomy_level": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4,
+                            "default": 1,
+                        },
+                    },
+                    "required": ["skill", "component"],
+                },
+                "SkillExecution": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "skill_name": {"type": "string"},
+                        "project_id": {"type": ["string", "null"]},
+                        "project_name": {"type": ["string", "null"]},
+                        "component": {"type": "string"},
+                        "autonomy_level": {"type": "integer"},
+                        "dry_run": {"type": "boolean"},
+                        "approved": {"type": "boolean"},
+                        "risk_level": {"type": "string"},
+                        "status": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "proposal": {"type": "object", "additionalProperties": True},
+                        "evidence": {"type": "object", "additionalProperties": True},
+                        "created_at": {"type": "string", "format": "date-time"},
+                    },
+                    "required": [
+                        "id",
+                        "skill_name",
+                        "project_id",
+                        "project_name",
+                        "component",
+                        "autonomy_level",
+                        "dry_run",
+                        "approved",
+                        "risk_level",
+                        "status",
+                        "reason",
+                        "proposal",
+                        "evidence",
+                        "created_at",
+                    ],
                 },
             }
         },
